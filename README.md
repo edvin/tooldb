@@ -9,6 +9,6 @@ a datasource and shut it down correctly before app exit.
 We are using HikariCP and MySQL in this example but the concepts should be the same
 for any DataSource or RDBMS, in fact even for most abstractions on top of JDBC. 
 
-Everything interesting is in the [DB.kt](/edvin/tooldb/blob/master/src/main/kotlin/com/cyclestart/tooldb/controllers/DB.kt) file.
+Everything interesting is in the [DB.kt](https://github.com/edvin/tooldb/blob/master/src/main/kotlin/com/cyclestart/tooldb/controllers/DB.kt) file.
 
 Also note that this demo project is not advocating best practices about how to use and organize SQL in any way. 
