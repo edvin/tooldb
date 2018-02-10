@@ -19,3 +19,10 @@ class Vendor() {
         }
     }
 }
+
+class VendorModel(vendor: Vendor? = null) : ItemViewModel<Vendor>(vendor) {
+    val id = bind(Vendor::idProperty)
+    val name = bind(Vendor::nameProperty)
+}
+
+class VendorAdded(val vendor: Vendor) : FXEvent()

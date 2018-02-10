@@ -3,6 +3,7 @@ package com.cyclestart.tooldb.controllers
 import com.cyclestart.tooldb.models.*
 import com.zaxxer.hikari.HikariDataSource
 import javafx.collections.FXCollections
+import javafx.collections.ListChangeListener
 import javafx.collections.ObservableList
 import tornadofx.*
 import java.sql.Connection
@@ -17,6 +18,9 @@ class DB : Controller() {
         password = System.getenv("dbPassword")
     }
 
+    // Used to track borrowed connections so we can show DB progress indicator in the Workspace
+    internal val borrowedConnections = FXCollections.observableArrayList<Connection>()
+
     init {
         beforeShutdown {
             ds.close()
@@ -24,6 +28,7 @@ class DB : Controller() {
     }
 
     fun listVendors() = ds.withConnection {
+        Thread.sleep(20000)
         prepareStatement("""
             SELECT id, name
             FROM vendor
@@ -34,6 +39,7 @@ class DB : Controller() {
         prepareStatement("INSERT INTO vendor (name) VALUES (?)").exec {
             setString(1, vendor.name)
         }
+        fire(VendorAdded(vendor))
     }
 
     fun updateVendor(vendor: Vendor) = ds.withConnection {
@@ -208,54 +214,76 @@ class DB : Controller() {
         }
     }
 
+    /**
+     * Apply the op function to the PreparedStatement and then call executeUpdate()
+     * This allows you to write `prepareStatement(sql).exec { setParametersHere() }` to
+     * set parameters easily and execute the sql effortlessly.
+     *
+     * This was not optimized further to `exec(sql) {}` because your IDE will
+     * allow auto completion for the `prepareStatement` sql parameter but not for a custom function
+     * as it can't recognize the sql anymore.
+     */
+    private fun PreparedStatement.exec(op: PreparedStatement.() -> Unit) = let {
+        op(it)
+        it.executeUpdate()
+    }
+
+    /**
+     * Apply the op function to the PreparedStatement and then call executeUpdate()
+     * This allows you to write `prepareStatement(sql).exec { setParametersHere() }` to
+     * set parameters easily and execute the sql effortlessly.
+     *
+     * This was not optimized further to `exec(sql) {}` because your IDE will
+     * allow auto completion for the `prepareStatement` sql parameter but not for a custom function
+     * as it can't recognize the sql anymore.
+     */
+    private fun PreparedStatement.execWithKeys(op: PreparedStatement.() -> Unit, keys: ResultSet.() -> Unit) = let {
+        op(it)
+        it.executeUpdate()
+        keys(generatedKeys)
+    }
+
+    /**
+     * Fetch a connection from the datasource and apply the op function to it before
+     * closing the connection.
+     */
+    private fun <T> DataSource.withConnection(op: Connection.() -> T) = connection.use {
+        try {
+            borrowedConnections.add(it)
+            op(it)
+        } finally {
+            borrowedConnections.remove(it)
+        }
+    }
+
+    /**
+     * Call executeQuery() on the PreparedStatement and call the fn parameter on each
+     * row in the ResultSet to create an observable list of items extracted from the rows.
+     */
+    fun <T> PreparedStatement.toModel(fn: (ResultSet) -> T) = executeQuery().toModel(fn)
+
+    /**
+     * Call the fn parameter on each row in the ResultSet to create an observable list of items extracted from the rows.
+     */
+    private fun <T> ResultSet.toModel(fn: (ResultSet) -> T): ObservableList<T> {
+        val list = FXCollections.observableArrayList<T>()
+        while (next()) list.add(fn(this))
+        return list
+    }
+
 }
 
-/**
- * Apply the op function to the PreparedStatement and then call executeUpdate()
- * This allows you to write `prepareStatement(sql).exec { setParametersHere() }` to
- * set parameters easily and execute the sql effortlessly.
- *
- * This was not optimized further to `exec(sql) {}` because your IDE will
- * allow auto completion for the `prepareStatement` sql parameter but not for a custom function
- * as it can't recognize the sql anymore.
- */
-fun PreparedStatement.exec(op: PreparedStatement.() -> Unit) = let {
-    op(it)
-    it.executeUpdate()
-}
+class DBActiveIndicator : Fragment() {
+    val db: DB by inject()
 
-/**
- * Apply the op function to the PreparedStatement and then call executeUpdate()
- * This allows you to write `prepareStatement(sql).exec { setParametersHere() }` to
- * set parameters easily and execute the sql effortlessly.
- *
- * This was not optimized further to `exec(sql) {}` because your IDE will
- * allow auto completion for the `prepareStatement` sql parameter but not for a custom function
- * as it can't recognize the sql anymore.
- */
-fun PreparedStatement.execWithKeys(op: PreparedStatement.() -> Unit, keys: ResultSet.() -> Unit) = let {
-    op(it)
-    it.executeUpdate()
-    keys(generatedKeys)
-}
+    override val root = progressindicator {
+        isVisible = false
+        setPrefSize(16.0, 16.0)
+    }
 
-/**
- * Fetch a connection from the datasource and apply the op function to it before
- * closing the connection.
- */
-fun <T> DataSource.withConnection(op: Connection.() -> T) = connection.use { op(it) }
-
-/**
- * Call executeQuery() on the PreparedStatement and call the fn parameter on each
- * row in the ResultSet to create an observable list of items extracted from the rows.
- */
-fun <T> PreparedStatement.toModel(fn: (ResultSet) -> T) = executeQuery().toModel(fn)
-
-/**
- * Call the fn parameter on each row in the ResultSet to create an observable list of items extracted from the rows.
- */
-fun <T> ResultSet.toModel(fn: (ResultSet) -> T): ObservableList<T> {
-    val list = FXCollections.observableArrayList<T>()
-    while (next()) list.add(fn(this))
-    return list
+    init {
+        db.borrowedConnections.addListener(ListChangeListener {
+            root.isVisible = db.borrowedConnections.isNotEmpty()
+        })
+    }
 }
