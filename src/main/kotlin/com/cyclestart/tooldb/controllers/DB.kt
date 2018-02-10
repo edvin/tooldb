@@ -28,7 +28,6 @@ class DB : Controller() {
     }
 
     fun listVendors() = ds.withConnection {
-        Thread.sleep(20000)
         prepareStatement("""
             SELECT id, name
             FROM vendor
