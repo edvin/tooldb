@@ -35,22 +35,49 @@ class DB : Controller() {
     }
 
     fun insertVendor(vendor: Vendor) = ds.withConnection {
-        prepareStatement("INSERT INTO vendor (name) VALUES (?)").exec {
+        prepareStatement("INSERT INTO vendor (name) VALUES (?)").update {
             setString(1, vendor.name)
         }
         fire(VendorAdded(vendor))
     }
 
     fun updateVendor(vendor: Vendor) = ds.withConnection {
-        prepareStatement("UPDATE vendor SET name = ? WHERE id = ?").exec {
+        prepareStatement("UPDATE vendor SET name = ? WHERE id = ?").update {
             setString(1, vendor.name)
             setInt(2, vendor.id)
         }
     }
 
     fun deleteVendor(vendor: Vendor) = ds.withConnection {
-        prepareStatement("DELETE FROM vendor WHERE id = ?").exec {
+        prepareStatement("DELETE FROM vendor WHERE id = ?").update {
             setInt(1, vendor.id)
+        }
+    }
+
+    fun listMillingProfiles() = ds.withConnection {
+        prepareStatement("""
+            SELECT id, name
+            FROM milling_profile
+            ORDER BY name""").toModel { MillingProfile(it) }
+    }
+
+    fun insertMillingProfile(profile: MillingProfile) = ds.withConnection {
+        prepareStatement("INSERT INTO milling_profile (name) VALUES (?)").update {
+            setString(1, profile.name)
+        }
+        fire(MillingProfileAdded(profile))
+    }
+
+    fun updateMillingProfile(profile: MillingProfile) = ds.withConnection {
+        prepareStatement("UPDATE milling_profile SET name = ? WHERE id = ?").update {
+            setString(1, profile.name)
+            setInt(2, profile.id)
+        }
+    }
+
+    fun deleteMillingProfile(milling_profile: MillingProfile) = ds.withConnection {
+        prepareStatement("DELETE FROM milling_profile WHERE id = ?").update {
+            setInt(1, milling_profile.id)
         }
     }
 
@@ -62,20 +89,20 @@ class DB : Controller() {
     }
 
     fun insertOperation(operation: Operation) = ds.withConnection {
-        prepareStatement("INSERT INTO operation (name) VALUES (?)").exec {
+        prepareStatement("INSERT INTO operation (name) VALUES (?)").update {
             setString(1, operation.name)
         }
     }
 
     fun updateOperation(operation: Operation) = ds.withConnection {
-        prepareStatement("UPDATE operation SET name = ? WHERE id = ?").exec {
+        prepareStatement("UPDATE operation SET name = ? WHERE id = ?").update {
             setString(1, operation.name)
             setInt(2, operation.id)
         }
     }
 
     fun deleteOperation(Operation: Operation) = ds.withConnection {
-        prepareStatement("DELETE FROM operation WHERE id = ?").exec {
+        prepareStatement("DELETE FROM operation WHERE id = ?").update {
             setInt(1, Operation.id)
         }
     }
@@ -88,14 +115,14 @@ class DB : Controller() {
     }
 
     fun insertMaterial(material: Material) = ds.withConnection {
-        prepareStatement("INSERT INTO material (name, hardness) VALUES (?, ?)").exec {
+        prepareStatement("INSERT INTO material (name, hardness) VALUES (?, ?)").update {
             setString(1, material.name)
             setString(2, material.hardness)
         }
     }
 
     fun updateMaterial(material: Material) = ds.withConnection {
-        prepareStatement("UPDATE material SET name = ?, hardness = ? WHERE id = ?").exec {
+        prepareStatement("UPDATE material SET name = ?, hardness = ? WHERE id = ?").update {
             setString(1, material.name)
             setString(2, material.hardness)
             setInt(3, material.id)
@@ -103,7 +130,7 @@ class DB : Controller() {
     }
 
     fun deleteMaterial(material: Material) = ds.withConnection {
-        prepareStatement("DELETE FROM material WHERE id = ?").exec {
+        prepareStatement("DELETE FROM material WHERE id = ?").update {
             setInt(1, material.id)
         }
     }
@@ -112,24 +139,24 @@ class DB : Controller() {
         prepareStatement("""
             SELECT id, name
             FROM tool_type
-            ORDER BY name""").toModel { Vendor(it) }
+            ORDER BY name""").toModel { ToolType(it) }
     }
 
     fun insertToolType(toolType: ToolType) = ds.withConnection {
-        prepareStatement("INSERT INTO tool_type (name) VALUES (?)").exec {
+        prepareStatement("INSERT INTO tool_type (name) VALUES (?)").update {
             setString(1, toolType.name)
         }
     }
 
     fun updateToolType(toolType: ToolType) = ds.withConnection {
-        prepareStatement("UPDATE tool_type SET name = ? WHERE id = ?").exec {
+        prepareStatement("UPDATE tool_type SET name = ? WHERE id = ?").update {
             setString(1, toolType.name)
             setInt(2, toolType.id)
         }
     }
 
     fun deleteToolType(toolType: ToolType) = ds.withConnection {
-        prepareStatement("DELETE FROM tool_type WHERE id = ?").exec {
+        prepareStatement("DELETE FROM tool_type WHERE id = ?").update {
             setInt(1, toolType.id)
         }
     }
@@ -142,7 +169,7 @@ class DB : Controller() {
             FROM tool t, vendor v, tool_type tt
             WHERE t.tool_type = tt.id
             AND t.vendor = v.id
-            ORDER BY t.description""").toModel { Vendor(it) }
+            ORDER BY t.description""").toModel { Tool(it) }
     }
 
     fun insertTool(tool: Tool) = ds.withConnection {
@@ -163,7 +190,7 @@ class DB : Controller() {
         prepareStatement("""
             UPDATE tool
             SET description = ?, tool_type = ?, vendor = ?, product_link = ?
-            WHERE id = ?""").exec {
+            WHERE id = ?""").update {
             setString(1, tool.description)
             setInt(2, tool.toolType.id)
             setInt(3, tool.vendor.id)
@@ -173,63 +200,112 @@ class DB : Controller() {
     }
 
     fun deleteTool(tool: Tool) = ds.withConnection {
-        prepareStatement("DELETE FROM tool WHERE id = ?").exec {
+        prepareStatement("DELETE FROM tool WHERE id = ?").update {
             setInt(1, tool.id)
         }
     }
 
-    fun listMillingProfiles() = ds.withConnection {
+    fun listEntriesForMillingProfile(profile: MillingProfile) = ds.withConnection {
         prepareStatement("""
-            SELECT p.id, p.name, p.material, m.name AS material_name, p.operation, o.name AS operation_name, p.ae_max, p.ap_max, p.vc
-            FROM milling_profile p, material m, operation o
+            SELECT p.id, p.material, m.name AS material_name, p.operation, o.name AS operation_name, p.ae_max, p.ap_max, p.vc
+            FROM milling_profile_entry p, material m, operation o
             WHERE p.material = m.id AND p.operation = o.id
-            ORDER BY p.name""").toModel { MillingProfile(it) }
+            ORDER BY m.name""")
+                .toModel { MillingProfileEntry(it) }
+                .also { connectFzToProfileEntries(it) }
     }
 
-    fun insertMillingProfile(profile: MillingProfile) = ds.withConnection {
-        prepareStatement("INSERT INTO milling_profile (name, material, operation, ae_max, ap_max, vc) VALUES (?, ?, ?, ?, ?, ?)").execWithKeys({
-            setString(1, profile.name)
-            setInt(2, profile.operation.id)
-            setDouble(3, profile.aeMax)
-            setDouble(4, profile.apMax)
-            setInt(5, profile.vc)
-        }, { profile.id = getInt(1) })
+    fun insertMillingProfileEntry(entry: MillingProfileEntry) = ds.withConnection {
+        prepareStatement("INSERT INTO milling_profile_entry (material, operation, ae_max, ap_max, vc) VALUES (?, ?, ?, ?, ?)").execWithKeys({
+            setInt(1, entry.operation.id)
+            setDouble(2, entry.aeMax)
+            setDouble(3, entry.apMax)
+            setInt(4, entry.vc)
+        }, { entry.id = getInt(1) })
     }
 
-    fun updateMillingProfile(profile: MillingProfile) = ds.withConnection {
-        prepareStatement("UPDATE milling_profile SET name = ?, operation = ?, ae_max = ?, ap_max = ?, vc = ? WHERE id = ?").exec {
-            setString(1, profile.name)
-            setInt(2, profile.operation.id)
-            setDouble(3, profile.aeMax)
-            setDouble(4, profile.apMax)
-            setInt(5, profile.vc)
-            setInt(6, profile.id)
+    private fun connectFzToProfileEntries(entries: List<MillingProfileEntry>) {
+        val fzList = ds.withConnection {
+            prepareStatement("SELECT * FROM fz WHERE milling_profile_entry IN (?)").query {
+                setArray(1, createArrayOf("INTEGER", entries.map { it.id }.toTypedArray()))
+            }
+        }.toModel { Fz(it) }
+
+        entries.forEach { entry ->
+            entry.fz = fzList.filter { it.millingProfileEntry == entry.id }.observable()
         }
     }
 
-    fun deleteMillingProfile(profile: MillingProfile) = ds.withConnection {
-        prepareStatement("DELETE FROM milling_profile WHERE id = ?").exec {
-            setInt(1, profile.id)
+    fun insertFz(fz: Fz) = ds.withConnection {
+        prepareStatement("INSERT INTO fz (milling_profile_entry, diameter, fz) VALUES (?, ?, ?)").update {
+            setInt(1, fz.millingProfileEntry)
+            setDouble(2, fz.diameter)
+            setDouble(3, fz.fz)
+        }
+    }
+
+    fun updateFz(fz: Fz) = ds.withConnection {
+        prepareStatement("UPDATE fz SET fz = ? WHERE milling_profile_entry = ? AND diameter = ?").update {
+            setDouble(1, fz.fz)
+            setInt(2, fz.millingProfileEntry)
+            setDouble(3, fz.diameter)
+        }
+    }
+
+    fun deleteFz(fz: Fz) = ds.withConnection {
+        prepareStatement("DELETE FROM fz WHERE milling_profile_entry = ? AND diameter = ?").update {
+            setInt(1, fz.millingProfileEntry)
+            setDouble(2, fz.diameter)
+        }
+    }
+
+    fun updateMillingProfileEntry(entry: MillingProfileEntry) = ds.withConnection {
+        prepareStatement("UPDATE milling_profile_entry SET operation = ?, ae_max = ?, ap_max = ?, vc = ? WHERE id = ?").update {
+            setInt(1, entry.operation.id)
+            setDouble(2, entry.aeMax)
+            setDouble(3, entry.apMax)
+            setInt(4, entry.vc)
+            setInt(5, entry.id)
+        }
+    }
+
+    fun deleteMillingProfileEntry(entry: MillingProfileEntry) = ds.withConnection {
+        prepareStatement("DELETE FROM milling_profile WHERE id = ?").update {
+            setInt(1, entry.id)
         }
     }
 
     /**
      * Apply the op function to the PreparedStatement and then call executeUpdate()
-     * This allows you to write `prepareStatement(sql).exec { setParametersHere() }` to
+     * This allows you to write `prepareStatement(sql).update { setParametersHere() }` to
      * set parameters easily and execute the sql effortlessly.
      *
-     * This was not optimized further to `exec(sql) {}` because your IDE will
+     * This was not optimized further to `update(sql) {}` because your IDE will
      * allow auto completion for the `prepareStatement` sql parameter but not for a custom function
      * as it can't recognize the sql anymore.
      */
-    private fun PreparedStatement.exec(op: PreparedStatement.() -> Unit) = let {
+    private fun PreparedStatement.update(op: PreparedStatement.() -> Unit): Int = let {
         op(it)
         it.executeUpdate()
     }
 
     /**
+     * Apply the op function to the PreparedStatement and then call executeQuery()
+     * This allows you to write `prepareStatement(sql).query { setParametersHere() }` to
+     * set parameters easily and execute the sql effortlessly and return the ResultSet.
+     *
+     * This was not optimized further to `query(sql) {}` because your IDE will
+     * allow auto completion for the `prepareStatement` sql parameter but not for a custom function
+     * as it can't recognize the sql anymore.
+     */
+    private fun PreparedStatement.query(op: PreparedStatement.() -> Unit): ResultSet = let {
+        op(it)
+        it.executeQuery()
+    }
+
+    /**
      * Apply the op function to the PreparedStatement and then call executeUpdate()
-     * This allows you to write `prepareStatement(sql).exec { setParametersHere() }` to
+     * This allows you to write `prepareStatement(sql).update { setParametersHere() }` to
      * set parameters easily and execute the sql effortlessly.
      *
      * This was not optimized further to `exec(sql) {}` because your IDE will

@@ -19,3 +19,10 @@ class ToolType() {
         }
     }
 }
+
+class ToolTypeModel(toolType: ToolType? = null) : ItemViewModel<ToolType>(toolType) {
+    val id = bind(ToolType::idProperty)
+    val name = bind(ToolType::nameProperty)
+}
+
+class ToolTypeAdded(val toolType: ToolType) : FXEvent()
