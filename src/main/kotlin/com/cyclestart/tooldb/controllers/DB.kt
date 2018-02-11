@@ -9,6 +9,7 @@ import tornadofx.*
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.Statement.RETURN_GENERATED_KEYS
 import javax.sql.DataSource
 
 class DB : Controller() {
@@ -31,7 +32,7 @@ class DB : Controller() {
         prepareStatement("""
             SELECT id, name
             FROM vendor
-            ORDER BY name""").toModel { Vendor(it) }
+            ORDER BY name""").query().toModel { Vendor(it) }
     }
 
     fun insertVendor(vendor: Vendor) = ds.withConnection {
@@ -58,7 +59,7 @@ class DB : Controller() {
         prepareStatement("""
             SELECT id, name
             FROM milling_profile
-            ORDER BY name""").toModel { MillingProfile(it) }
+            ORDER BY name""").query().toModel { MillingProfile(it) }
     }
 
     fun insertMillingProfile(profile: MillingProfile) = ds.withConnection {
@@ -85,7 +86,7 @@ class DB : Controller() {
         prepareStatement("""
             SELECT id, name
             FROM operation
-            ORDER BY name""").toModel { Operation(it) }
+            ORDER BY name""").query().toModel { Operation(it) }
     }
 
     fun insertOperation(operation: Operation) = ds.withConnection {
@@ -109,24 +110,26 @@ class DB : Controller() {
 
     fun listMaterials() = ds.withConnection {
         prepareStatement("""
-            SELECT id, name, hardness
+            SELECT id, name, hardness, color
             FROM material
-            ORDER BY name""").toModel { Material(it) }
+            ORDER BY name""").query().toModel { Material(it) }
     }
 
     fun insertMaterial(material: Material) = ds.withConnection {
-        prepareStatement("INSERT INTO material (name, hardness) VALUES (?, ?)").update {
+        prepareStatement("INSERT INTO material (name, hardness, color) VALUES (?, ?, ?)").update {
             setString(1, material.name)
             setString(2, material.hardness)
+            setString(3, material.color.toString())
         }
         fire(MaterialAdded(material))
     }
 
     fun updateMaterial(material: Material) = ds.withConnection {
-        prepareStatement("UPDATE material SET name = ?, hardness = ? WHERE id = ?").update {
+        prepareStatement("UPDATE material SET name = ?, hardness = ?, color = ? WHERE id = ?").update {
             setString(1, material.name)
             setString(2, material.hardness)
-            setInt(3, material.id)
+            setString(3, material.color.toString())
+            setInt(4, material.id)
         }
     }
 
@@ -140,7 +143,7 @@ class DB : Controller() {
         prepareStatement("""
             SELECT id, name
             FROM tool_type
-            ORDER BY name""").toModel { ToolType(it) }
+            ORDER BY name""").query().toModel { ToolType(it) }
     }
 
     fun insertToolType(toolType: ToolType) = ds.withConnection {
@@ -171,13 +174,12 @@ class DB : Controller() {
             FROM tool t, vendor v, tool_type tt
             WHERE t.tool_type = tt.id
             AND t.vendor = v.id
-            ORDER BY t.description""").toModel { Tool(it) }
+            ORDER BY t.description""").query().toModel { Tool(it) }
     }
 
     fun insertTool(tool: Tool) = ds.withConnection {
         prepareStatement("""
-            INSERT INTO tool (tool_type, product_id, vendor, product_link, description) VALUES (?, ?, ?, ?, ?)"""
-        ).execWithKeys({
+            INSERT INTO tool (tool_type, product_id, vendor, product_link, description) VALUES (?, ?, ?, ?, ?)""", RETURN_GENERATED_KEYS).execWithKeys({
             setInt(1, tool.toolType.id)
             setString(2, tool.productId)
             setInt(3, tool.vendor.id)
@@ -209,29 +211,40 @@ class DB : Controller() {
 
     fun listEntriesForMillingProfile(profile: MillingProfile) = ds.withConnection {
         prepareStatement("""
-            SELECT p.id, p.material, m.name AS material_name, p.operation, o.name AS operation_name, p.ae_max, p.ap_max, p.vc
-            FROM milling_profile_entry p, material m, operation o
-            WHERE p.material = m.id AND p.operation = o.id
-            ORDER BY m.name""")
+            SELECT p.id, p.milling_profile, mp.name AS milling_profile_name, p.material, m.name AS material_name, m.hardness AS material_hardness, p.operation, o.name AS operation_name, p.ae_max, p.ap_max, p.vc
+            FROM milling_profile_entry p, material m, operation o, milling_profile mp
+            WHERE p.material = m.id AND p.operation = o.id AND p.milling_profile = mp.id
+            AND p.milling_profile = ?
+            ORDER BY m.name""").query {
+            setInt(1, profile.id)
+        }
                 .toModel { MillingProfileEntry(it) }
                 .also { connectFzToProfileEntries(it) }
     }
 
     fun insertMillingProfileEntry(entry: MillingProfileEntry) = ds.withConnection {
-        prepareStatement("INSERT INTO milling_profile_entry (material, operation, ae_max, ap_max, vc) VALUES (?, ?, ?, ?, ?)").execWithKeys({
-            setInt(1, entry.operation.id)
-            setDouble(2, entry.aeMax)
-            setDouble(3, entry.apMax)
-            setInt(4, entry.vc)
+        prepareStatement("INSERT INTO milling_profile_entry (milling_profile, material, operation, ae_max, ap_max, vc) VALUES (?, ?, ?, ?, ?, ?)", RETURN_GENERATED_KEYS).execWithKeys({
+            setInt(1, entry.millingProfile.id)
+            setInt(2, entry.material.id)
+            setInt(3, entry.operation.id)
+            setDouble(4, entry.aeMax)
+            setDouble(5, entry.apMax)
+            setInt(6, entry.vc)
         }, { entry.id = getInt(1) })
+        fire(MillingProfileEntryAdded(entry))
     }
 
     private fun connectFzToProfileEntries(entries: List<MillingProfileEntry>) {
+        val ids: List<Int> = entries.map { it.id }
+        if (ids.isEmpty()) return
         val fzList = ds.withConnection {
-            prepareStatement("SELECT * FROM fz WHERE milling_profile_entry IN (?)").query {
-                setArray(1, createArrayOf("INTEGER", entries.map { it.id }.toTypedArray()))
-            }
-        }.toModel { Fz(it) }
+            prepareStatement("SELECT * FROM fz WHERE milling_profile_entry IN (${ids.joinToString(",") { "?" }})").query {
+                // MySQL doesn't support connection.createArray so we do it the awful way instead
+                ids.forEachIndexed { index, i ->
+                    setInt(index + 1, i)
+                }
+            }.toModel { Fz(it) }
+        }
 
         entries.forEach { entry ->
             entry.fz = fzList.filter { it.millingProfileEntry == entry.id }.observable()
@@ -244,6 +257,7 @@ class DB : Controller() {
             setDouble(2, fz.diameter)
             setDouble(3, fz.fz)
         }
+        fire(FzAdded(fz))
     }
 
     fun updateFz(fz: Fz) = ds.withConnection {
@@ -252,6 +266,10 @@ class DB : Controller() {
             setInt(2, fz.millingProfileEntry)
             setDouble(3, fz.diameter)
         }
+    }
+
+    fun saveFz(fz: Fz) {
+        if (updateFz(fz) == 0) insertFz(fz)
     }
 
     fun deleteFz(fz: Fz) = ds.withConnection {
@@ -300,8 +318,8 @@ class DB : Controller() {
      * allow auto completion for the `prepareStatement` sql parameter but not for a custom function
      * as it can't recognize the sql anymore.
      */
-    private fun PreparedStatement.query(op: PreparedStatement.() -> Unit): ResultSet = let {
-        op(it)
+    private fun PreparedStatement.query(op: (PreparedStatement.() -> Unit)? = null): ResultSet = let {
+        op?.invoke(it)
         it.executeQuery()
     }
 
@@ -332,12 +350,6 @@ class DB : Controller() {
             borrowedConnections.remove(it)
         }
     }
-
-    /**
-     * Call executeQuery() on the PreparedStatement and call the fn parameter on each
-     * row in the ResultSet to create an observable list of items extracted from the rows.
-     */
-    fun <T> PreparedStatement.toModel(fn: (ResultSet) -> T) = executeQuery().toModel(fn)
 
     /**
      * Call the fn parameter on each row in the ResultSet to create an observable list of items extracted from the rows.

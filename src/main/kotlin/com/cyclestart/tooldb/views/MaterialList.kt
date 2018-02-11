@@ -53,12 +53,16 @@ class MaterialList : View("Materials") {
                         textfield(material.hardness).required()
                     }
                 }
-                button("Create").action {
-                    material.commit {
-                        runAsync {
-                            db.insertMaterial(material.item)
-                        } ui {
-                            close()
+                button("Create") {
+                    isDefaultButton = true
+
+                    action {
+                        material.commit {
+                            runAsync {
+                                db.insertMaterial(material.item)
+                            } ui {
+                                close()
+                            }
                         }
                     }
                 }

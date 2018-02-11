@@ -1,6 +1,8 @@
 package com.cyclestart.tooldb.models
 
 import javafx.beans.property.*
+import javafx.collections.FXCollections
+import javafx.scene.control.TreeItem
 import tornadofx.*
 import java.sql.ResultSet
 
@@ -8,8 +10,8 @@ class MillingProfileEntry() {
     val idProperty = SimpleIntegerProperty()
     var id by idProperty
 
-    val nameProperty = SimpleStringProperty()
-    var name by nameProperty
+    val millingProfileProperty = SimpleObjectProperty<MillingProfile>()
+    var millingProfile by millingProfileProperty
 
     val materialProperty = SimpleObjectProperty<Material>()
     var material by materialProperty
@@ -26,20 +28,24 @@ class MillingProfileEntry() {
     val vcProperty = SimpleIntegerProperty()
     var vc by vcProperty
 
-    val fzList = SimpleListProperty<Fz>()
-    var fz by fzList
+    val fzProperty = SimpleListProperty<Fz>(FXCollections.observableArrayList())
+    var fz by fzProperty
 
     constructor(rs: ResultSet) : this() {
         with(rs) {
             id = getInt("id")
-            name = getString("name")
             material = Material().apply {
                 id = getInt("material")
                 name = getString("material_name")
+                hardness = getString("material_hardness")
             }
             operation = Operation().apply {
                 id = getInt("operation")
                 name = getString("operation_name")
+            }
+            millingProfile = MillingProfile().apply {
+                id = getInt("milling_profile")
+                name = getString("milling_profile_name")
             }
             aeMax = getDouble("ae_max")
             apMax = getDouble("ap_max")
@@ -47,3 +53,15 @@ class MillingProfileEntry() {
         }
     }
 }
+
+class MillingProfileEntryModel(entry: MillingProfileEntry? = null) : ItemViewModel<MillingProfileEntry>(entry) {
+    val id = bind(MillingProfileEntry::idProperty)
+    val material = bind(MillingProfileEntry::materialProperty)
+    val operation = bind(MillingProfileEntry::operationProperty)
+    val aeMax = bind(MillingProfileEntry::aeMaxProperty)
+    val apMax = bind(MillingProfileEntry::apMaxProperty)
+    val vc = bind(MillingProfileEntry::vcProperty)
+    val fz = bind(MillingProfileEntry::fzProperty)
+}
+
+class MillingProfileEntryAdded(val entry: MillingProfileEntry) : FXEvent()

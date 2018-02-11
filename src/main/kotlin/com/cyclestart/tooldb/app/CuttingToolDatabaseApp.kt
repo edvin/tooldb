@@ -11,7 +11,7 @@ class CuttingToolWorkspace : Workspace() {
     init {
         navigationMode = NavigationMode.Tabs
 
-        root.setPrefSize(800.0, 600.0)
+        root.setPrefSize(1024.0, 768.0)
 
         menubar {
             menu("Settings") {

@@ -2,8 +2,7 @@ package com.cyclestart.tooldb.models
 
 import javafx.beans.property.SimpleDoubleProperty
 import javafx.beans.property.SimpleIntegerProperty
-import tornadofx.getValue
-import tornadofx.setValue
+import tornadofx.*
 import java.sql.ResultSet
 
 class Fz() {
@@ -13,7 +12,7 @@ class Fz() {
     val diameterProperty = SimpleDoubleProperty()
     var diameter by diameterProperty
 
-    val fzProperty = SimpleDoubleProperty()
+    val fzProperty = SimpleDoubleProperty(this, "fz")
     var fz by fzProperty
 
     constructor(rs: ResultSet) : this() {
@@ -24,3 +23,11 @@ class Fz() {
         }
     }
 }
+
+class FzModel(fz: Fz? = null) : ItemViewModel<Fz>(fz) {
+    val millingProfileEntry = bind(Fz::millingProfileEntryProperty)
+    val diameter = bind(Fz::diameterProperty)
+    val fz = bind(Fz::fzProperty)
+}
+
+class FzAdded(val fz: Fz) : FXEvent()

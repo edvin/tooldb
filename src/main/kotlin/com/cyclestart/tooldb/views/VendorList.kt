@@ -49,12 +49,15 @@ class VendorList : View("Vendors") {
                         textfield(vendor.name).required()
                     }
                 }
-                button("Create").action {
-                    vendor.commit {
-                        runAsync {
-                            db.insertVendor(vendor.item)
-                        } ui {
-                            close()
+                button("Create") {
+                    isDefaultButton = true
+                    action {
+                        vendor.commit {
+                            runAsync {
+                                db.insertVendor(vendor.item)
+                            } ui {
+                                close()
+                            }
                         }
                     }
                 }

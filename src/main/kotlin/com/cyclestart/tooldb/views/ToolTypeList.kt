@@ -49,12 +49,16 @@ class ToolTypeTypeList : View("ToolTypes") {
                         textfield(toolType.name).required()
                     }
                 }
-                button("Create").action {
-                    toolType.commit {
-                        runAsync {
-                            db.insertToolType(toolType.item)
-                        } ui {
-                            close()
+                button("Create") {
+                    isDefaultButton = true
+
+                    action {
+                        toolType.commit {
+                            runAsync {
+                                db.insertToolType(toolType.item)
+                            } ui {
+                                close()
+                            }
                         }
                     }
                 }

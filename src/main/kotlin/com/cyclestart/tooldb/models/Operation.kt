@@ -18,4 +18,6 @@ class Operation() {
             name = getString("name")
         }
     }
+
+    override fun toString() = name
 }

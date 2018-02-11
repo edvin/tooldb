@@ -51,13 +51,17 @@ class MillingProfileList : View("MillingProfiles") {
                         textfield(profile.name).required()
                     }
                 }
-                button("Create").action {
-                    profile.commit {
-                        runAsync {
-                            db.insertMillingProfile(profile.item)
-                        } ui {
-                            close()
-                            editProfile(profile.item)
+                button("Create") {
+                    isDefaultButton = true
+
+                    action {
+                        profile.commit {
+                            runAsync {
+                                db.insertMillingProfile(profile.item)
+                            } ui {
+                                close()
+                                editProfile(profile.item)
+                            }
                         }
                     }
                 }
