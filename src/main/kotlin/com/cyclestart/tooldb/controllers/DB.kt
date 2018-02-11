@@ -119,6 +119,7 @@ class DB : Controller() {
             setString(1, material.name)
             setString(2, material.hardness)
         }
+        fire(MaterialAdded(material))
     }
 
     fun updateMaterial(material: Material) = ds.withConnection {
@@ -146,6 +147,7 @@ class DB : Controller() {
         prepareStatement("INSERT INTO tool_type (name) VALUES (?)").update {
             setString(1, toolType.name)
         }
+        fire(ToolTypeAdded(toolType))
     }
 
     fun updateToolType(toolType: ToolType) = ds.withConnection {

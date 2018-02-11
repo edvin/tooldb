@@ -1,6 +1,7 @@
 package com.cyclestart.tooldb.app
 
 import com.cyclestart.tooldb.controllers.DBActiveIndicator
+import com.cyclestart.tooldb.views.MaterialList
 import com.cyclestart.tooldb.views.MillingProfileList
 import com.cyclestart.tooldb.views.ToolTypeTypeList
 import com.cyclestart.tooldb.views.VendorList
@@ -16,6 +17,7 @@ class CuttingToolWorkspace : Workspace() {
             menu("Settings") {
                 item("Vendors").action { dock<VendorList>() }
                 item("Tool Types").action { dock<ToolTypeTypeList>() }
+                item("Materials").action { dock<MaterialList>() }
                 item("Milling Profiles").action { dock<MillingProfileList>() }
             }
         }

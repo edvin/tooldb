@@ -23,3 +23,11 @@ class Material() {
         }
     }
 }
+
+class MaterialModel(material: Material? = null) : ItemViewModel<Material>(material) {
+    val id = bind(Material::idProperty)
+    val name = bind(Material::nameProperty)
+    val hardness = bind(Material::hardnessProperty)
+}
+
+class MaterialAdded(val material: Material) : FXEvent()
