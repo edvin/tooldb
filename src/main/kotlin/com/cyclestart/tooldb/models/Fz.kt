@@ -30,4 +30,4 @@ class FzModel(fz: Fz? = null) : ItemViewModel<Fz>(fz) {
     val fz = bind(Fz::fzProperty)
 }
 
-class FzAdded(val fz: Fz) : FXEvent()
+class FzAdded(val fz: Fz? = null) : FXEvent()

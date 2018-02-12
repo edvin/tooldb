@@ -4,6 +4,7 @@ import com.cyclestart.tooldb.controllers.DB
 import com.cyclestart.tooldb.models.*
 import javafx.beans.property.DoubleProperty
 import javafx.beans.property.SimpleDoubleProperty
+import javafx.beans.property.SimpleStringProperty
 import javafx.collections.ObservableList
 import tornadofx.*
 
@@ -82,10 +83,10 @@ class MillingProfileEditor : View("Edit milling profile") {
                 }
             }
             contextmenu {
-                item("Add fz for new diameter") {
+                item("Add fz") {
                     enableWhen(selectionModel.selectedItemProperty().isNotNull)
                     action {
-                        selectedItem?.let { addFz(it) }
+                        selectedItem?.let { quickAddFz(it) }
                     }
                 }
             }
@@ -93,27 +94,32 @@ class MillingProfileEditor : View("Edit milling profile") {
         }
     }
 
-    private fun addFz(entry: MillingProfileEntry) {
-        val fz = FzModel(Fz().apply { millingProfileEntry = entry.id })
+    private fun quickAddFz(entry: MillingProfileEntry) {
+        val quickModel = object : ViewModel() {
+            val diameters = bind { SimpleStringProperty(config.string("diametersDefault", "")) }
+            val fzs = bind { SimpleStringProperty() }
+        }
 
-        dialog("Add fz for new diameter") {
+        dialog("Quick add fz") {
             form {
+                label("Enter a space separated list of diameters followed by a space separated list of corresponding fz values")
                 fieldset {
-                    field("Diameter") {
-                        textfield(fz.diameter).required()
+                    field("Diameters") {
+                        textfield(quickModel.diameters).required()
                     }
-                    field("Fz") {
-                        textfield(fz.fz).required()
+                    field("Fz values") {
+                        textfield(quickModel.fzs).required()
                     }
                 }
                 button("Add") {
                     isDefaultButton = true
 
                     action {
-                        fz.commit {
-                            runAsync {
-                                db.insertFz(fz.item)
-                            } ui {
+                        quickModel.commit {
+                            if (quickModel.diameters.value.isBlank()) {
+                                warning("Input error", "Enter at least one pair and try again")
+                            } else {
+                                addMultiFz(entry, quickModel.diameters.value, quickModel.fzs.value)
                                 close()
                             }
                         }
@@ -123,14 +129,45 @@ class MillingProfileEditor : View("Edit milling profile") {
         }
     }
 
+    private fun addMultiFz(entry: MillingProfileEntry, diametersString: String, fzsString: String) {
+        val diameters = diametersString.split(" ").map { it.trim().toDouble() }
+        val fzs = fzsString.split(" ").map { it.trim().toDouble() }
+
+        if (diameters.size != fzs.size) {
+            warning("Input error", "Invalid input, please correct and try again")
+        } else {
+            runAsync {
+                diameters.zip(fzs).forEach { pair ->
+                    val newFz = Fz().apply {
+                        millingProfileEntry = entry.id
+                        diameter = pair.first
+                        fz = pair.second
+                    }
+                    db.saveFz(newFz, false)
+                }
+            } ui {
+                config["diametersDefault"] = diametersString
+                config.save()
+                fire(FzAdded())
+            }
+        }
+    }
+
     override fun onCreate() {
         val entry = MillingProfileEntryModel(MillingProfileEntry().apply {
             millingProfile = profile.item
         })
+        val diameters = SimpleStringProperty(config.string("diametersDefault", ""))
+        val fzs = SimpleStringProperty()
 
         tornadofx.runAsync {
             db.listMaterials() to db.listOperations()
         } ui { (materials, operations) ->
+            // Default to previously used material
+            config.int("materialDefault")?.also { default ->
+                entry.material.value = materials.find { it.id == default }
+            }
+
             dialog("Add data for given material and cutting operation") {
                 form {
                     fieldset {
@@ -149,6 +186,15 @@ class MillingProfileEditor : View("Edit milling profile") {
                         field("Vc") {
                             textfield(entry.vc).required()
                         }
+                        label("Optional: Space separated list of diameters followed by a space separated list of corresponding fz values")
+                        fieldset {
+                            field("Diameters") {
+                                textfield(diameters)
+                            }
+                            field("Fz values") {
+                                textfield(fzs)
+                            }
+                        }
                     }
                     button("Create") {
                         isDefaultButton = true
@@ -158,6 +204,9 @@ class MillingProfileEditor : View("Edit milling profile") {
                                 tornadofx.runAsync {
                                     db.insertMillingProfileEntry(entry.item)
                                 } ui {
+                                    addMultiFz(entry.item, diameters.value, fzs.value)
+                                    config["materialDefault"] = entry.material.value.id.toString()
+                                    config.save()
                                     close()
                                 }
                             }

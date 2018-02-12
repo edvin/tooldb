@@ -186,6 +186,7 @@ class DB : Controller() {
             setString(4, tool.productLink)
             setString(5, tool.description)
         }, {
+            next()
             tool.id = getInt(1)
         })
     }
@@ -230,7 +231,10 @@ class DB : Controller() {
             setDouble(4, entry.aeMax)
             setDouble(5, entry.apMax)
             setInt(6, entry.vc)
-        }, { entry.id = getInt(1) })
+        }, {
+            next()
+            entry.id = getInt(1)
+        })
         fire(MillingProfileEntryAdded(entry))
     }
 
@@ -251,13 +255,13 @@ class DB : Controller() {
         }
     }
 
-    fun insertFz(fz: Fz) = ds.withConnection {
+    fun insertFz(fz: Fz, fireAddEvent: Boolean = true) = ds.withConnection {
         prepareStatement("INSERT INTO fz (milling_profile_entry, diameter, fz) VALUES (?, ?, ?)").update {
             setInt(1, fz.millingProfileEntry)
             setDouble(2, fz.diameter)
             setDouble(3, fz.fz)
         }
-        fire(FzAdded(fz))
+        if (fireAddEvent) fire(FzAdded(fz))
     }
 
     fun updateFz(fz: Fz) = ds.withConnection {
@@ -268,8 +272,8 @@ class DB : Controller() {
         }
     }
 
-    fun saveFz(fz: Fz) {
-        if (updateFz(fz) == 0) insertFz(fz)
+    fun saveFz(fz: Fz, fireAddEvent: Boolean = true) {
+        if (updateFz(fz) == 0) insertFz(fz, fireAddEvent)
     }
 
     fun deleteFz(fz: Fz) = ds.withConnection {
